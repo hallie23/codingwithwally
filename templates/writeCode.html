@@ -3,21 +3,43 @@
 {% block head %}
 <link rel = "stylesheet" href= "{{ url_for('static', filename = 'css/writeCode.css') }}">
 <script type = "text/javascript" src = "https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+<script type = "text/javascript" src="{{ url_for('static', filename = 'ace/mytheme.js') }}"></script>
 <script defer type = "text/javascript" src="{{ url_for('static', filename = 'js/select.js') }}"></script>
 <script type=text/javascript>
 	$(function() {
 		$('input#submitCode').bind('click', function() {
-		$.getJSON('/background_process_writeCode', {
+		$.getJSON('/background_process_writeHMMM', {
 			code: ace.edit("jsEditor").getValue(),
+			inputs: $("#myText").val(),
 		}, function(data) {
 			if (typeof data.result == "string"){
-				$("#result").text(data.result)
+				$("#result").text(data.result);
 			}
 			else{
-				yourAnswers = data.result[1]
-				$("#result1").text(yourAnswers[0]);
-				$("#result2").text(yourAnswers[1]);
-				$("#result3").text(yourAnswers[2]);
+				// yourAnswers = data.result[1]
+				// $("#result1").text(outputs);
+				// $("#result2").text(yourAnswers[1]);
+				// $("#result3").text(yourAnswers[2]);
+				var print = "";
+				var outputs = data.result[0];
+				for (i = 0; i < outputs.length; i++) {
+					print += outputs[i] + "\n";
+				}
+				$("#result").text(print);
+
+				// var registers = data.result[1];
+				// $("#reg1").text(registers[1].toString());
+
+				var registers = data.result[1];
+				var rows = '';
+				for (i = 0; i < registers.length; i++) {
+					var row = '<tr>';
+					row += '<td>' + "r" + i.toString() + '</td>';
+					row += '<td>' + registers[i].toString() + '</td>';
+					rows += row + '<tr>';
+				}
+
+				$("#regTable").html(rows);
 			}
 
 
@@ -28,49 +50,273 @@
 </script>
 {% endblock %}
 
-{% block options %}
+<!-- {% block options %}
 	<option value = "selectOption">select option</option>
     <option value = "writeCode" selected>write code</option>
     <option value = "testInputs">test inputs</option>
     <option value = "testOutputs">test outputs</option> 
-{% endblock %}
+{% endblock %} -->
 
 {% block content %}
     <form>
-        <div id = "jsEditor">def sum13(nums):
-		</div>
+        <div id = "jsEditor">00 </div>
 		<script type = "text/javascript">
+			//ace.config.set('themePath', '../static/ace');
+			//ace.config.set('modePath', '../static/ace');
 			var editor = ace.edit("jsEditor");
+			// var lines = 1;
+			// editor.session.on("change", function(e) {
+			// 	if (lines != editor.session.getLength()) {
+			// 		editor.setValue('hi');
+			// 	}
+			// 	lines = editor.session.getLength();
+			// })
 			editor.setTheme("ace/theme/monokai");
 			editor.session.setMode("ace/mode/python");
+			//Selection.on("changeCursor", function())
+			editor.moveCursorTo(0,3);
+			editor.commands.addCommand({
+				name: "returnReorder",
+				bindKey: {win: "return", mac: "return"},
+				exec: function(editor) {
+					// reorder
+					// lines += 1;
+					// define function
+					const zeroPad = (num, places) => String(num).padStart(places, '0');
+					
+					// add new number
+					selectionRange = editor.getSelectionRange();
+					var startLine = selectionRange.start.row;
+					var startChar = selectionRange.start.column;
+					var lineNum = zeroPad((startLine + 1).toString(),2);
+					editor.session.insert(editor.getCursorPosition(), '\n' + lineNum + ' ');
+					
+					// renumber after
+					// var pos = editor.getCursorPosition();
+					// var r = new Range(pos.row, pos.column, editor.end.row, editor.end.column);
+					// var toShift = editor.session.getTextRange(r);
+					// var shifted = '';
+					// while ('\n' in toShift) {
+					// 	i = toShift.indexOf('\n');
+					// 	shifted += toShift.slice(0,i+1);
+					// 	toShift = toShift.slice(i,-1);
+					// 	n = toShift.slice(0,2);
+					// 	n = n.parseInt();
+					// 	n += 1;
+					// 	n = zeroPad(n.toString(), 2);
+					// }
+					// editor.session.insert(editor.getCursorPosition(), shifted);
+
+					
+					// var text = ace.edit("jsEditor").getValue();
+					// var newText = previous + '\n' + lineNum + '';
+					// ace.edit("jsEditor").setValue(newText);
+					// editor.clearSelection();
+
+					// fix jumps
+					// const zeroPad = (num, places) => String(num).padStart(places, '0');
+					// const zeroPad = (num, places) => String(num).padStart(places, '0');
+					var start = editor.getCursorPosition().row + 1;
+					var length = editor.session.getLength();
+					var toShift = editor.session.getLines(0, length-1);
+					var shifted = '';
+					var arr = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
+					for (n=0; n<length; n++) {
+						var line = toShift[n];
+						if ((arr.filter(x => line.includes(x))).length > 0) {
+							var num = parseInt(line.slice(-2));
+							if (num >= start-1 && num < length-1) {
+								newNum = zeroPad((num + 1).toString(), 2);
+								line = line.slice(0,-2) + newNum;
+							}
+						}
+						if (!isNaN(line.slice(0,2)) && line.slice(0,2) != '') {
+							shifted += zeroPad(n.toString(), 2) + ' ' + line.slice(3);
+						}
+						else {
+							shifted += zeroPad(n.toString(), 2) + ' ' + line;
+						}
+						if (n != length-1) {
+							shifted += '\n';
+						}
+
+					}
+					editor.setValue(shifted);
+					editor.clearSelection();
+					editor.moveCursorTo(start-1,3);
+
+					// add case for if returning at end of line or moving stuff onto next line
+				}
+			})
+			editor.commands.addCommand({
+				name: "deleteReorder",
+				bindKey: {win: "backspace", mac: "backspace"},
+				exec: function(editor) {
+					// reorder
+
+					// fix bug: for jumpn 10 if the last row is 10, deleting wont update
+					// fix move cursor for delete at end
+
+					if (editor.getCursorPosition().column <= 3) {
+						editor.removeToLineStart();
+						editor.session.getDocument().removeNewLine(editor.getCursorPosition().row-1);
+
+						var r = editor.getCursorPosition().row;
+						
+						const zeroPad = (num, places) => String(num).padStart(places, '0');
+						var length = editor.session.getLength();
+						var toShift = editor.session.getLines(0, length-1);
+						var shifted = '';
+						var arr = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
+						var x = 0;
+						for (n=0; n<length; n++) {
+							var line = toShift[n];
+							if ((arr.filter(x => line.includes(x))).length > 0) {
+								var num = parseInt(line.trim().slice(-2));
+								if (num - 1 >= r && num < length) { ///check
+								 	newNum = zeroPad((num - 1).toString(), 2);
+								 	line = line.slice(0,-2) + newNum;
+								}
+							}
+							if (!isNaN(line.slice(0,2)) && line.slice(0,2) != '') {
+								shifted += zeroPad(n.toString(), 2) + ' ' + line.slice(3);
+							}
+							else {
+								shifted += zeroPad(n.toString(), 2) + ' ' + line;
+							}
+							if (n != length-1) {
+								shifted += '\n';
+							}
+							if (r+1 == n) {
+								var x = line.slice(3).length;
+							}
+
+						}
+						editor.setValue(shifted);
+						editor.clearSelection();
+						var l = editor.session.getLine(r).length;
+						editor.moveCursorTo(r,l - x);
+					}
+					else {
+						var p = editor.getCursorPosition();
+						editor.session.remove(new Range(p.row-2,p.column-2,p.row, p.column));
+					}
+					// const zeroPad = (num, places) => String(num).padStart(places, '0');
+					// var length = editor.session.getLength();
+					// var toShift = editor.session.getLines(0, length-1);
+					// var shifted = '';
+					// var arr = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
+					// for (n=0; n<length; n++) {
+					// 	var line = toShift[n];
+					// 	if ((arr.filter(x => line.includes(x))).length > 0) {
+					// 		var num = parseInt(line.slice(-2));
+					// 		if (num >= start-1 && num < length-1) {
+					// 			newNum = zeroPad((num + 1).toString(), 2);
+					// 			line = line.slice(0,-2) + newNum;
+					// 		}
+					// 	}
+					// 	if (!isNaN(line.slice(0,2)) && line.slice(0,2) != '') {
+					// 		shifted += zeroPad(n.toString(), 2) + ' ' + line.slice(3);
+					// 	}
+					// 	else {
+					// 		shifted += zeroPad(n.toString(), 2) + ' ' + line;
+					// 	}
+					// 	if (n != length-1) {
+					// 		shifted += '\n';
+					// 	}
+
+					// }
+					// editor.setValue(shifted);
+					// editor.clearSelection();
+					//editor.moveCursorLineEnd();
+
+					// define function
+					// const zeroPad = (num, places) => String(num).padStart(places, '0');
+					
+					// // add new number
+					// selectionRange = editor.getSelectionRange();
+					// var startLine = selectionRange.start.row;
+					// var startChar = selectionRange.start.column;
+					// var lineNum = zeroPad((startLine + 1).toString(),2);
+					// editor.session.insert(editor.getCursorPosition(), '\n' + lineNum + ' ');
+				}
+			})
 		</script>
 		<input class = "submitbtn" id = "submitCode" type = "submit" value="submit" />
     </form>
 {% endblock %}
 
 {% block answers %}
-	<table>
+	<input type="text" id="myText" value="">
+	<p id = "result" style = "color:white"></p>
+{% endblock %}
+
+{% block registers %}	
+	<table id="regTable">
 		<tr>
-			<th>test case</th>
-			<th>output</th>
-			<th>expected output</th>
+			<td>r0</td>
+			<td></td>
 		</tr>
 		<tr>
-			<td>[1, 2, 2, 1]</td>
-			<td id = "result1"></td>
-			<td>6</td>
+			<td>r1</td>
+			<td></td>
 		</tr>
 		<tr>
-			<td>[1, 1]</td>
-			<td id = "result2"></td>
-			<td>2</td>
+			<td>r2</td>
+			<td></td>
 		</tr>
 		<tr>
-			<td>[1, 2, 2, 1, 13]</td>
-			<td id = "result3"></td>
-			<td>6</td>
+			<td>r3</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r4</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r5</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r6</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r7</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r8</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r9</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r10</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r11</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r12</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r13</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r14</td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>r15</td>
+			<td></td>
 		</tr>
 	</table>
-    <p id = "result" style = "color:white"></p>
 {% endblock %}
 

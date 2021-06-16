@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Coding With Wally</title>
+    <title>HMMM With Wally</title>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,44 +27,29 @@
 
     <div id="sidebar" class = "noselect">
         <a href="#">home</a>
-        <a href="#">random problem</a>
-        <a href="#">help</a>
     </div>
 
     <div id="main">
         <div id="header" class = "noselect">
-            <h1>CODING WITH WALLY</h1>
-            <h3>sum13</h3>
-            <form name="selectForm" id = "selectForm" action="{{ url_for('change_type') }}" method="post" style="display: inline-block;">
-                <input type="hidden" id="hiddenSelect" name="hiddenSelect" value = "ma"/>
-            </form>
-                <div class="custom-select">
-                    <select>
-                        {% block options %}
-                        {% endblock %}
-                    </select>
-                </div>
+            <h1>HMMM WITH WALLY</h1>
         </div>
         <div style="width:60%;">
             <p>
-                Return the sum of the numbers in the array, returning 0 for an empty array. Except the number 13 is very
-                unlucky, so it does not count and numbers that come immediately after a 13 also do not count.
-                <br>
-                <br>
-                sum13([1, 2, 2, 1]) → 6
-                <br>
-                sum13([1, 1]) → 2
-                <br>
-                sum13([1, 2, 2, 1, 13]) → 6
+                Welcome to HMMM (Harvey Mudd Miniature Machine)! 
+                <a id="HMMMlink" href="https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html"
+                   target="_blank">HMMM Documentation here</a>
             </p>
         </div>
         <div id="flexbox">
             <div class="flexchild" id="leftcontent">
                 {% block content %}{% endblock %}
             </div>
-            <div class="flexchild" id="rightcontent">
-                <h2>results</h2>
+            <div class="flexchild" id="midcontent">
+                <p id="inputprompt">inputs (separate with spaces):</p>
                 {% block answers %}{% endblock %}
+            </div>
+            <div class="flexchild" id="rightcontent">
+                {% block registers %}{% endblock %}
             </div>
         </div>
     </div>

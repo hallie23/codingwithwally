@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import traceback
 import pcode
+import hmmm
 
 app = Flask(__name__)
 
@@ -8,18 +9,14 @@ app = Flask(__name__)
 def index():
     return render_template('writeCode.html')
 
-@app.route('/background_process_writeCode')
-def background_process_writeCode():
+@app.route('/background_process_writeHMMM')
+def background_process_writeHMMM():
   code = request.args.get('code')
+  inputs = request.args.get('inputs')
   try:
-    exec(code)
-    testInputs = [
-    [1, 2, 2, 1],
-    [1,1],
-    [1,2,2,1,13]
-    ]
-    correctAns, testAns = pcode.checkAnswers(code, pcode.correctFunc, testInputs)
-    return jsonify(result = [correctAns, testAns])
+    outputs, registers = hmmm.main(code, inputs)
+    print(registers)
+    return jsonify(result = [outputs, registers])
   except Exception as e: 
     return jsonify(result = "Error: " + str(e))
 

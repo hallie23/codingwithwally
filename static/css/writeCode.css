@@ -17,3 +17,22 @@
 #submitCode{
     margin-top: 1.2em;
 }
+
+#myText{
+    margin: auto;
+    margin-top: 2vh;
+    width: 90%;
+}
+
+#result{
+    width: 80%;
+    margin: auto;
+    margin-top: 3vh;
+    padding: 8px;
+    height: auto;
+    text-align: left;
+    white-space: pre-wrap;
+    background: rgb(22, 23, 19);
+    border: 5px solid black;
+    border-radius: 3;
+}
