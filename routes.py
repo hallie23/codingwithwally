@@ -14,9 +14,9 @@ def background_process_writeHMMM():
   code = request.args.get('code')
   inputs = request.args.get('inputs')
   try:
-    outputs, registers = hmmm.main(code, inputs)
-    print(registers)
-    return jsonify(result = [outputs, registers])
+    outputs, states = hmmm.main(code, inputs)
+    print(states)
+    return jsonify(result = [outputs, states])
   except Exception as e: 
     return jsonify(result = "Error: " + str(e))
 

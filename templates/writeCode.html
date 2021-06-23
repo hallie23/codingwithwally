@@ -6,8 +6,10 @@
 <script type = "text/javascript" src="{{ url_for('static', filename = 'ace/mytheme.js') }}"></script>
 <script defer type = "text/javascript" src="{{ url_for('static', filename = 'js/select.js') }}"></script>
 <script type=text/javascript>
+	var states = [];
+	var currentState = 0;
 	$(function() {
-		$('input#submitCode').bind('click', function() {
+		$('input#runAll').click(function() {
 		$.getJSON('/background_process_writeHMMM', {
 			code: ace.edit("jsEditor").getValue(),
 			inputs: $("#myText").val(),
@@ -16,10 +18,13 @@
 				$("#result").text(data.result);
 			}
 			else{
-				// yourAnswers = data.result[1]
-				// $("#result1").text(outputs);
-				// $("#result2").text(yourAnswers[1]);
-				// $("#result3").text(yourAnswers[2]);
+				document.getElementById("runAll").classList.add('buttonSelected');
+				if (document.getElementById("runStep").classList.contains('buttonSelected')) {
+					document.getElementById("runStep").classList.remove('buttonSelected');
+				}
+				document.getElementById("forward").style.display = "none";
+				document.getElementById("back").style.display = "none";
+
 				var print = "";
 				var outputs = data.result[0];
 				for (i = 0; i < outputs.length; i++) {
@@ -27,11 +32,10 @@
 				}
 				$("#result").text(print);
 
-				// var registers = data.result[1];
-				// $("#reg1").text(registers[1].toString());
-
-				var registers = data.result[1];
-				var rows = '';
+				currentState = 0;
+				states = data.result[1];
+				var registers = data.result[1][states.length - 1][1];
+				var rows = '<tr><td>registers</td><td>values</td></tr>';
 				for (i = 0; i < registers.length; i++) {
 					var row = '<tr>';
 					row += '<td>' + "r" + i.toString() + '</td>';
@@ -47,15 +51,138 @@
 		return false;
 		});
 	});
+
+	var written = '';
+
+	$(function() {
+		$('input#runStep').click(function() {
+		$.getJSON('/background_process_writeHMMM', {
+			code: ace.edit("jsEditor").getValue(),
+			inputs: $("#myText").val(),
+		}, function(data) {
+			// if ($("#mode").val() == true)
+			if (typeof data.result == "string"){
+				$("#result").text(data.result);
+			}
+			else{
+				currentState = 0;
+				written = '';
+				states = data.result[1];
+
+				document.getElementById("runStep").classList.add('buttonSelected');
+				if (document.getElementById("runAll").classList.contains('buttonSelected')) {
+					document.getElementById("runAll").classList.remove('buttonSelected');
+				}
+				document.getElementById("forward").style.display = "block";
+				document.getElementById("back").style.display = "block";
+				if (states.length <= 2) {
+					document.getElementById("forward").className = "buttonDisabled";
+				}
+				else {
+					document.getElementById("forward").className = "buttonActive";
+				}
+				document.getElementById("back").className = "buttonDisabled";
+				
+				//ace.edit("jsEditor").moveCursorTo(0,0);
+				//ace.edit("jsEditor").selection.selectLine();
+				var lineLen = ace.edit("jsEditor").session.getLine(0).length;
+				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(0,0,0,10));
+
+				var rows = '<tr><td>registers</td><td>values</td></tr>';
+				for (i = 0; i < 16; i++) {
+					var row = '<tr>';
+					row += '<td>' + "r" + i.toString() + '</td>';
+					row += '<td>' + '0' + '</td>';
+					rows += row + '<tr>';
+				}
+
+				$("#regTable").html(rows);
+				$("#result").text(written);
+			}
+
+
+		});
+		return false;
+		});
+	});
+
+	$(function() {
+		$("input#forward").click(function() {
+			if (document.getElementById("forward").className == "buttonActive") {
+				currentState++;
+
+				if (currentState > 0) {
+					document.getElementById("back").className = "buttonActive";
+				}
+				if (currentState >= states.length - 2) {
+					document.getElementById("forward").className = "buttonDisabled";
+				}
+				if (states[currentState][2] == 'r') {
+				 	// ask for input?
+				}
+				else if (states[currentState][2] != '') {
+				 	written += states[currentState][2].toString() + '\n';
+				}
+
+				var line = states[currentState][0];
+				var lineLen = ace.edit("jsEditor").session.getLine(line).length;
+				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(line,0,line,lineLen));
+
+				var registers = states[currentState][1];
+				var rows = '<tr><td>registers</td><td>values</td></tr>';
+				for (i = 0; i < registers.length; i++) {
+					var row = '<tr>';
+					row += '<td>' + "r" + i.toString() + '</td>';
+					row += '<td>' + registers[i].toString() + '</td>';
+					rows += row + '<tr>';
+				}
+				$("#regTable").html(rows);
+				$("#result").text(written);
+			}
+		});
+	});
+
+	$(function() {
+		$("input#back").click(function() {
+			// only run if button is not disabled
+			if (document.getElementById("back").className == "buttonActive") {
+				currentState = currentState - 1;
+				
+				if (currentState < states.length - 2) {
+					document.getElementById("forward").className = "buttonActive";
+				}
+				if (currentState == 0) {
+					document.getElementById("back").className = "buttonDisabled";
+				}
+				if (states[currentState+1][2] != 'r' && states[currentState+1][2] != '') {
+					if (written.split('\n').length <= 2) {
+						written = '';
+					}
+					else {
+						written = written.substring(0, written.substring(0,written.length-1).lastIndexOf("\n") + 1);
+					}
+				}
+				
+				var line = states[currentState][0];
+				var lineLen = ace.edit("jsEditor").session.getLine(line).length;
+				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(line,0,line,lineLen));
+
+				var registers = states[currentState][1];
+				var rows = '<tr><td>registers</td><td>values</td></tr>';
+				for (i = 0; i < registers.length; i++) {
+					var row = '<tr>';
+					row += '<td>' + "r" + i.toString() + '</td>';
+					row += '<td>' + registers[i].toString() + '</td>';
+					rows += row + '<tr>';
+				}
+				$("#regTable").html(rows);
+				$("#result").text(written);
+			}
+		});
+	});
+
 </script>
 {% endblock %}
-
-<!-- {% block options %}
-	<option value = "selectOption">select option</option>
-    <option value = "writeCode" selected>write code</option>
-    <option value = "testInputs">test inputs</option>
-    <option value = "testOutputs">test outputs</option> 
-{% endblock %} -->
 
 {% block content %}
     <form>
@@ -75,19 +202,25 @@
 			editor.session.setMode("ace/mode/python");
 			//Selection.on("changeCursor", function())
 			editor.moveCursorTo(0,3);
+			editor.session.getDocument().on("change", function(e) {
+				if (document.getElementById("runAll").classList.contains('buttonSelected')) {
+					document.getElementById("runAll").classList.remove('buttonSelected');
+				}
+				if (document.getElementById("runStep").classList.contains('buttonSelected')) {
+					document.getElementById("runStep").classList.remove('buttonSelected');
+				}
+				document.getElementById("forward").style.display = "none";
+				document.getElementById("back").style.display = "none";
+			});
 			editor.commands.addCommand({
 				name: "returnReorder",
 				bindKey: {win: "return", mac: "return"},
 				exec: function(editor) {
-					// reorder
-					// lines += 1;
 					// define function
 					const zeroPad = (num, places) => String(num).padStart(places, '0');
 					
 					// add new number
-					selectionRange = editor.getSelectionRange();
-					var startLine = selectionRange.start.row;
-					var startChar = selectionRange.start.column;
+					var startLine = editor.getSelectionRange().start.row;
 					var lineNum = zeroPad((startLine + 1).toString(),2);
 					editor.session.insert(editor.getCursorPosition(), '\n' + lineNum + ' ');
 					
@@ -113,17 +246,15 @@
 					// ace.edit("jsEditor").setValue(newText);
 					// editor.clearSelection();
 
-					// fix jumps
-					// const zeroPad = (num, places) => String(num).padStart(places, '0');
-					// const zeroPad = (num, places) => String(num).padStart(places, '0');
 					var start = editor.getCursorPosition().row + 1;
+					
 					var length = editor.session.getLength();
 					var toShift = editor.session.getLines(0, length-1);
 					var shifted = '';
-					var arr = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
+					var ops = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
 					for (n=0; n<length; n++) {
 						var line = toShift[n];
-						if ((arr.filter(x => line.includes(x))).length > 0) {
+						if ((ops.filter(x => line.includes(x))).length > 0) {
 							var num = parseInt(line.slice(-2));
 							if (num >= start-1 && num < length-1) {
 								newNum = zeroPad((num + 1).toString(), 2);
@@ -160,18 +291,18 @@
 					if (editor.getCursorPosition().column <= 3) {
 						editor.removeToLineStart();
 						editor.session.getDocument().removeNewLine(editor.getCursorPosition().row-1);
-
+						var pos = editor.getCursorPosition();
 						var r = editor.getCursorPosition().row;
 						
 						const zeroPad = (num, places) => String(num).padStart(places, '0');
 						var length = editor.session.getLength();
 						var toShift = editor.session.getLines(0, length-1);
 						var shifted = '';
-						var arr = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
+						var ops = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
 						var x = 0;
 						for (n=0; n<length; n++) {
 							var line = toShift[n];
-							if ((arr.filter(x => line.includes(x))).length > 0) {
+							if ((ops.filter(x => line.includes(x))).length > 0) {
 								var num = parseInt(line.trim().slice(-2));
 								if (num - 1 >= r && num < length) { ///check
 								 	newNum = zeroPad((num - 1).toString(), 2);
@@ -194,8 +325,7 @@
 						}
 						editor.setValue(shifted);
 						editor.clearSelection();
-						var l = editor.session.getLine(r).length;
-						editor.moveCursorTo(r,l - x);
+						editor.moveCursorTo(pos.row,pos.column);
 					}
 					else {
 						var p = editor.getCursorPosition();
@@ -242,8 +372,13 @@
 				}
 			})
 		</script>
-		<input class = "submitbtn" id = "submitCode" type = "submit" value="submit" />
     </form>
+	<div id="buttons">
+		<input class = "buttonActive" id = "runAll" type = "submit" value="RUN ALL" />
+		<input class = "buttonActive" id = "runStep" type = "submit" value="STEP THROUGH" />
+		<input class = "buttonDisabled" id = "back" type = "button" value="<- back" style="display:none"/>
+		<input class = "buttonDisabled" id = "forward" type = "button" value="-> next" style="display:none"/>
+	</div>
 {% endblock %}
 
 {% block answers %}
@@ -253,6 +388,10 @@
 
 {% block registers %}	
 	<table id="regTable">
+		<tr>
+			<td>registers</td>
+			<td>values</td>
+		</tr>
 		<tr>
 			<td>r0</td>
 			<td></td>

@@ -14,7 +14,11 @@
     text-align:left !important;
 }
 
-#submitCode{
+#runAll{
+    margin-top: 1.2em;
+}
+
+#runStep{
     margin-top: 1.2em;
 }
 

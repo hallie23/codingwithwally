@@ -34,7 +34,7 @@ Options:
     --version                   Show version.
 """
 
-import sys, string, re
+import sys, string, re, copy
 have_docopt = True
 try:
     import docopt
@@ -155,7 +155,7 @@ arguments = {
 def main(program, inputs):
     """Hmmm assembler and simulator.  Normally called by running the file.
        If it is called internally, will assemble and run "program"."""
-    global debug
+    global debug, states
     revision = '$Revision: 2.7 $'
     version = re.search(r'Revision: ([0-9.]*)', revision).group(1)
     if program is not None:
@@ -213,7 +213,7 @@ def main(program, inputs):
         debug = True
     try:
         runHmmm(inputs)
-        return writes, registers
+        return writes, states
     except KeyboardInterrupt:
         print("\n\nInterrupted by user, halting program execution...\n",
           file = sys.stderr)
@@ -501,9 +501,10 @@ lastPC = 0              # where the program counter was 1 instruction ago
 codeSize = 0            # can't execute past this or read/write before this
 reads = []              # EDIT: reads supplied with initial run for online editor
 writes = []             # EDIT: writes collected in list instead of printed
+states = [[0]] + [[0]*16]
 
 def resetGlobals():
-    global memory, registers, pc, instruction, debug, ask, lastPC, codeSize, reads, writes
+    global memory, registers, pc, instruction, debug, ask, lastPC, codeSize, reads, writes, states
     memory = [0]*256
     registers = [0]*16
     pc = 0
@@ -514,6 +515,7 @@ def resetGlobals():
     codeSize = 0
     reads = []
     writes = []
+    states = [[0, [0]*16, '']]
 
 def validInteger(x):
     if type(x) == int:
@@ -590,7 +592,7 @@ def validAddr(addr):
 
 def runHmmm(inputs):
     """Execute a program that has previously been loaded into Hmmm's memory."""
-    global pc, instruction, memory, loop_check, lastPC, codeSize, reads, writes
+    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
     for x in inputs.split():
         reads += [x]
     while pc != -1:         # fetch/execute cycle
@@ -602,7 +604,10 @@ def runHmmm(inputs):
         lastPC = pc
         pc = pc+1           # increment pc
         try:
+            states += [['','','']]
             execute(instruction)
+            states[-1][0] = pc
+            states[-1][1] = copy.deepcopy(registers)
         except KeyboardInterrupt:
             print("\n\nInterrupted by user, halting program execution...\n")
             sys.exit()
@@ -896,7 +901,7 @@ for triplet in opcodes:
 def execute(instruction):
     """Execute a single Hmmm instruction.  As part of that, offer the
        debugging menu."""
-    global memory, registers, pc, debug, ask, lastPC
+    global memory, registers, pc, debug, ask, lastPC, states, writes
 
     if instruction == "" or validInteger(instruction):
         simulationError("Bad instruction at memory location " + lastPC)
@@ -914,6 +919,11 @@ def execute(instruction):
 
     if opcode in implementations:
         implementations[opcode](args)
+        if opcode == 'read':
+            print('r')
+            states[-1][2] = 'r'
+        elif opcode == 'write':
+            states[-1][2] = writes[-1]
     else:
         simulationError("Invalid operation code at pc " + str(lastPC))
 
