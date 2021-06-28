@@ -223,10 +223,10 @@ def main(program, inputs, numSteps=-1):
     try:
         if numSteps == -1:
             runHmmm(inputs)
-        # elif numSteps >= 0 and type(numSteps) == int:
-        #     runHmmmSteps(inputs, numSteps)
-        # else:
-        #     print("bad steps number")
+        elif numSteps >= 0 and type(numSteps) == int:
+            runHmmmSteps(inputs, numSteps)
+        else:
+            print("bad steps number")
         return writes, states
     except KeyboardInterrupt:
         print("\n\nInterrupted by user, halting program execution...\n",
@@ -637,32 +637,32 @@ def runHmmm(inputs):
             print("\n\nEnd of input, halting program execution...\n")
             sys.exit()
 
-# def runHmmmSteps(inputs, numSteps):
-#     """Execute a program that has previously been loaded into Hmmm's memory."""
-#     global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
-#     for x in inputs.split():
-#         reads += [x]
-#     for i in range(numSteps):         # fetch/execute cycle
-#         if pc == -1:
-#             break
-#         if not validPC(pc):
-#             simulationError("Memory Out of Bounds Error.\n"
-#               + "Program attempted to execute memory location " + str(pc))
-#         instruction = memory[pc]
-#                             # Fetch and store into instruction register
-#         lastPC = pc
-#         pc = pc+1           # increment pc
-#         try:
-#             states += [['','','']]
-#             execute(instruction)
-#             states[-1][0] = pc
-#             states[-1][1] = copy.deepcopy(registers)
-#         except KeyboardInterrupt:
-#             print("\n\nInterrupted by user, halting program execution...\n")
-#             sys.exit()
-#         except EOFError:
-#             print("\n\nEnd of input, halting program execution...\n")
-#             sys.exit()
+def runHmmmSteps(inputs, numSteps):
+    """Execute a program that has previously been loaded into Hmmm's memory."""
+    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
+    for x in inputs.split():
+        reads += [x]
+    for i in range(numSteps):         # fetch/execute cycle
+        if pc == -1:
+            break
+        if not validPC(pc):
+            simulationError("Memory Out of Bounds Error.\n"
+              + "Program attempted to execute memory location " + str(pc))
+        instruction = memory[pc]
+                            # Fetch and store into instruction register
+        lastPC = pc
+        pc = pc+1           # increment pc
+        try:
+            states += [['','','']]
+            execute(instruction)
+            states[-1][0] = pc
+            states[-1][1] = copy.deepcopy(registers)
+        except KeyboardInterrupt:
+            print("\n\nInterrupted by user, halting program execution...\n")
+            sys.exit()
+        except EOFError:
+            print("\n\nEnd of input, halting program execution...\n")
+            sys.exit()
 
 def checkOverflow(register, instruction, lastPC):
     """Check a register value for overflow; if it is illegal issue error
