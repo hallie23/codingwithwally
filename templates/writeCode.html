@@ -4,18 +4,34 @@
 <link rel = "stylesheet" href= "{{ url_for('static', filename = 'css/writeCode.css') }}">
 <script type = "text/javascript" src = "https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
 <script type = "text/javascript" src="{{ url_for('static', filename = 'ace/mytheme.js') }}"></script>
-<script defer type = "text/javascript" src="{{ url_for('static', filename = 'js/select.js') }}"></script>
+<script type = "text/javascript" src="{{ url_for('static', filename = 'js/download.js') }}"></script>
 <script type=text/javascript>
+	$(function() {
+		$("#download").click(function() {
+			var filename = prompt("Please enter the file name:", "wally.txt");
+			if (filename != null && filename != "") {
+				text = ace.edit("jsEditor").getValue();
+				download(filename, text);
+			}
+		});
+	});
+
 	var states = [];
 	var currentState = 0;
 	$(function() {
 		$('input#runAll').click(function() {
+		if (! ace.edit("jsEditor").getValue().includes('halt')) {
+			var error = "Code must include operation 'halt'";
+			$("#errors").text(error);
+			return;
+		}
+		$("#errors").text('');
 		$.getJSON('/background_process_writeHMMM', {
 			code: ace.edit("jsEditor").getValue(),
 			inputs: $("#myText").val(),
 		}, function(data) {
 			if (typeof data.result == "string"){
-				$("#result").text(data.result);
+				$("#errors").text(data.result);
 			}
 			else{
 				document.getElementById("runAll").classList.add('buttonSelected');
@@ -56,6 +72,7 @@
 
 	$(function() {
 		$('input#runStep').click(function() {
+		$("#errors").text('');
 		$.getJSON('/background_process_writeHMMM', {
 			code: ace.edit("jsEditor").getValue(),
 			inputs: $("#myText").val(),
@@ -384,6 +401,7 @@
 {% block answers %}
 	<input type="text" id="myText" value="">
 	<p id = "result" style = "color:white"></p>
+	<p id = "errors" style = "color:white"></p>
 {% endblock %}
 
 {% block registers %}	

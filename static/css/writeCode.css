@@ -40,3 +40,12 @@
     border: 5px solid black;
     border-radius: 3;
 }
+
+#errors{
+    width: 80%;
+    margin: auto;
+    margin-top: 2vh;
+    padding: 8px;
+    height: auto;
+    text-align: center;
+}

@@ -14,6 +14,10 @@
 
 # modified by Hallie Seay, June 2021 for use in online editor
 
+
+# **** add "run x steps" function
+
+
 """Assemble and execute Hmmm programs.
 
 Usage:
@@ -152,7 +156,7 @@ arguments = {
 ######################################################################
 ######################################################################
 
-def main(program, inputs):
+def main(program, inputs, numSteps=-1):
     """Hmmm assembler and simulator.  Normally called by running the file.
        If it is called internally, will assemble and run "program"."""
     global debug, states
@@ -194,8 +198,13 @@ def main(program, inputs):
 
     if not isMachineCode(program):
         program = hmmmAssembler(program)
+        print(program)
+        print(type(program))
         if program is None:
             sys.exit(1)
+
+        elif type(program) == str:
+            return program, None
 
         if args['--output']:
             writeMachineCode(program, args['--output'])
@@ -212,7 +221,12 @@ def main(program, inputs):
     if args['--debug']:
         debug = True
     try:
-        runHmmm(inputs)
+        if numSteps == -1:
+            runHmmm(inputs)
+        # elif numSteps >= 0 and type(numSteps) == int:
+        #     runHmmmSteps(inputs, numSteps)
+        # else:
+        #     print("bad steps number")
         return writes, states
     except KeyboardInterrupt:
         print("\n\nInterrupted by user, halting program execution...\n",
@@ -371,6 +385,7 @@ def assemble(program):
         # and arguments
         if len(re.findall(r'^([0-9]+)[\s]+([a-z]+)[\s]*(([-r0-9xXa-fA-F]+[,\s]*)*)([\s]+(#.*)*)*$', line)) != 1:
             print("\nSYNTAX ERROR ON LINE {}:".format(lineNum))
+            return "\nSYNTAX ERROR ON LINE {}:".format(lineNum)
             print(line)
             output.append([lineNum, "***SYNTAX ERROR HERE***", line])
             continue
@@ -380,6 +395,7 @@ def assemble(program):
         try:
             userLine = int(flds[0])
         except ValueError:
+            return "\nMISSING LINE NUMBER AT LINE {}:".format(lineNum)
             print("\nMISSING LINE NUMBER AT LINE {}:".format(lineNum))
             print("FOUND:", flds[0])
             output.append([lineNum, "***MISSING LINE NUMBER HERE***", line])
@@ -387,8 +403,12 @@ def assemble(program):
 
         instruction = translate(flds[1:])
         triplet = [lineNum, instruction, line]
+        if 'ERROR' in instruction:
+            print('hi', instruction)
+            return instruction
 
         if instruction[0] != '*' and lineNum != userLine:
+            return "\nBAD LINE NUMBER AT LINE {}:".format(lineNum)
             print("\nBAD LINE NUMBER AT LINE {}:".format(lineNum))
             print("LINE NUMBER: {} EXPECTED {}".format(flds[0], lineNum))
             output.append([lineNum, "***BAD LINE NUMBER HERE***", line])
@@ -449,6 +469,8 @@ def hmmmAssembler(program):
        error occurs, returns None.  Error messages are printed directly to
        stdout (this is because the program listing also goes to stdout)."""
     machineCode = assemble(program)
+    if type(machineCode) == str:
+        return machineCode
 
     # check whether there are any errors
     failure = False
@@ -614,6 +636,33 @@ def runHmmm(inputs):
         except EOFError:
             print("\n\nEnd of input, halting program execution...\n")
             sys.exit()
+
+# def runHmmmSteps(inputs, numSteps):
+#     """Execute a program that has previously been loaded into Hmmm's memory."""
+#     global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
+#     for x in inputs.split():
+#         reads += [x]
+#     for i in range(numSteps):         # fetch/execute cycle
+#         if pc == -1:
+#             break
+#         if not validPC(pc):
+#             simulationError("Memory Out of Bounds Error.\n"
+#               + "Program attempted to execute memory location " + str(pc))
+#         instruction = memory[pc]
+#                             # Fetch and store into instruction register
+#         lastPC = pc
+#         pc = pc+1           # increment pc
+#         try:
+#             states += [['','','']]
+#             execute(instruction)
+#             states[-1][0] = pc
+#             states[-1][1] = copy.deepcopy(registers)
+#         except KeyboardInterrupt:
+#             print("\n\nInterrupted by user, halting program execution...\n")
+#             sys.exit()
+#         except EOFError:
+#             print("\n\nEnd of input, halting program execution...\n")
+#             sys.exit()
 
 def checkOverflow(register, instruction, lastPC):
     """Check a register value for overflow; if it is illegal issue error

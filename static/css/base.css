@@ -7,16 +7,6 @@ html, body {
     cursor: default;
 }
 
-.noselect {
-    -webkit-touch-callout: none; /* iOS Safari */
-      -webkit-user-select: none; /* Safari */
-       -khtml-user-select: none; /* Konqueror HTML */
-         -moz-user-select: none; /* Old versions of Firefox */
-          -ms-user-select: none; /* Internet Explorer/Edge */
-              user-select: none; /* Non-prefixed version, currently
-                                    supported by Chrome, Edge, Opera and Firefox */
-  }
-
 #sidebar{
     height: 100%; /* Full-height: remove this if you want "auto" height */
     width: 200px; /* Set the width of the sidebar */
@@ -43,6 +33,12 @@ html, body {
 
     background-color: rgb(255,181,49);
     color: rgb(39, 40, 34);
+}
+
+#download {
+    width: 50px;
+    margin-left: 50px;
+    overflow-x:
 }
 #main {
     height: 100%;
