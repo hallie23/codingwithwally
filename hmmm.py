@@ -156,10 +156,10 @@ arguments = {
 ######################################################################
 ######################################################################
 
-def main(program, inputs, numSteps=-1):
+def main(program, inputs, state=[], numSteps=1):
     """Hmmm assembler and simulator.  Normally called by running the file.
        If it is called internally, will assemble and run "program"."""
-    global debug, states
+    global debug, states, memory
     revision = '$Revision: 2.7 $'
     version = re.search(r'Revision: ([0-9.]*)', revision).group(1)
     if program is not None:
@@ -196,8 +196,12 @@ def main(program, inputs, numSteps=-1):
             args['HMMM-SOURCE'] = input('Enter input file name: ')
         program = readFile(args['HMMM-SOURCE'])
 
+    resetGlobals()
     if not isMachineCode(program):
-        program = hmmmAssembler(program)
+        if state == []:
+            program = hmmmAssembler(program)
+        else:
+            program = hmmmAssembler(program, False)
         print(program)
         print(type(program))
         if program is None:
@@ -216,18 +220,22 @@ def main(program, inputs, numSteps=-1):
     # We have either assembled the file or read a binary file.  We're
     # ready to run it.
     #
-    resetGlobals()
     convertMachineCode(program)
     if args['--debug']:
         debug = True
     try:
-        if numSteps == -1:
+        error = None
+        if state == []:
             runHmmm(inputs)
         elif numSteps >= 0 and type(numSteps) == int:
-            runHmmmSteps(inputs, numSteps)
+            error = runHmmmSteps(inputs, state, numSteps)
         else:
             print("bad steps number")
-        return writes, states
+            # check for bad state?
+        if error != None:
+            return error, None
+        else:
+            return writes, states
     except KeyboardInterrupt:
         print("\n\nInterrupted by user, halting program execution...\n",
           file = sys.stderr)
@@ -302,7 +310,7 @@ def translate(flds):
     except KeyError:
         print("\nOPERATION ERROR:")
         print("'{} IS NOT A VALID OPERATION.".format(flds[0]))
-        return "***OPERATION ERROR HERE***"
+        return "** '{}' is not a valid operation line ".format(flds[0])
     encoding = opval
     extraBits = '0000'
     argsRequired = arguments[flds[0]]
@@ -321,7 +329,7 @@ def translate(flds):
         print("DETECTED {} ARGUMENTS, EXPECTED {} ARGUMENTS"
           .format(argc, numArgsRequired))
         print(flds[0], flds[1])
-        return "***ARGUMENT ERROR HERE***"
+        return "**DETECTED {} ARGUMENTS, EXPECTED {} ARGUMENTS ON LINE ".format(argc, numArgsRequired) 
     for p in parts:
         if p == '':
             print("\nARGUMENT ERROR:")
@@ -376,7 +384,8 @@ def translate(flds):
 
     return insertBits(encoding, extraBits)
 
-def assemble(program):
+def assemble(program, runAll=True):
+    global errors
     output = []
     lineNum = -1
     for line in program:
@@ -384,35 +393,38 @@ def assemble(program):
         # nasty regular expression to parse line number, instruction,
         # and arguments
         if len(re.findall(r'^([0-9]+)[\s]+([a-z]+)[\s]*(([-r0-9xXa-fA-F]+[,\s]*)*)([\s]+(#.*)*)*$', line)) != 1:
-            print("\nSYNTAX ERROR ON LINE {}:".format(lineNum))
-            return "\nSYNTAX ERROR ON LINE {}:".format(lineNum)
-            print(line)
-            output.append([lineNum, "***SYNTAX ERROR HERE***", line])
+            print('line:', line)
+            if runAll:
+                return "SYNTAX ERROR ON LINE {}:".format(lineNum)
+            else:
+                print("SYNTAX ERROR")
+                output.append([lineNum, "0000 0000 0000 0000", line])
+                errors[lineNum] = "SYNTAX ERROR ON LINE " + str(lineNum)
             continue
 
         flds = re.sub(r'^([0-9]+)[\s]+([a-z]+)[\s]*(([-r0-9xXa-fA-F]+[,\s]*)*)([\s]+(#.*)*)*$', r'\1~\2~\3', line).split('~')
-
-        try:
-            userLine = int(flds[0])
-        except ValueError:
-            return "\nMISSING LINE NUMBER AT LINE {}:".format(lineNum)
-            print("\nMISSING LINE NUMBER AT LINE {}:".format(lineNum))
-            print("FOUND:", flds[0])
-            output.append([lineNum, "***MISSING LINE NUMBER HERE***", line])
-            continue
-
+        print('line:', line)
+        print(flds)
         instruction = translate(flds[1:])
         triplet = [lineNum, instruction, line]
-        if 'ERROR' in instruction:
-            print('hi', instruction)
-            return instruction
-
-        if instruction[0] != '*' and lineNum != userLine:
-            return "\nBAD LINE NUMBER AT LINE {}:".format(lineNum)
-            print("\nBAD LINE NUMBER AT LINE {}:".format(lineNum))
-            print("LINE NUMBER: {} EXPECTED {}".format(flds[0], lineNum))
-            output.append([lineNum, "***BAD LINE NUMBER HERE***", line])
+        if '*' in instruction:
+            print('hi')
+            if runAll:
+                print('yolee')
+                return instruction
+            else:
+                print('yolo')
+                output.append([lineNum, "0000 0000 0000 0000", line])
+                errors[lineNum] = instruction + str(lineNum)
             continue
+
+        # if instruction[0] != '*' and lineNum != userLine:
+        #     if runAll:
+        #         return "\nBAD LINE NUMBER AT LINE {}:".format(lineNum)
+        #     else:
+        #         output.append([lineNum, "0000 0000 0000 0000", line])
+        #         errors[lineNum] = "\nBAD LINE NUMBER AT LINE {}:".format(lineNum)
+        #     continue
 
         output.append(triplet)
     return output
@@ -464,11 +476,11 @@ def programToMachineCode(program):
     """Convert the result of an assembled program into internal machien code."""
     return [triplet[1] for triplet in program]
 
-def hmmmAssembler(program):
+def hmmmAssembler(program, runAll=True):
     """Assemble the given program and return it as a string.  If an assembly
        error occurs, returns None.  Error messages are printed directly to
        stdout (this is because the program listing also goes to stdout)."""
-    machineCode = assemble(program)
+    machineCode = assemble(program, runAll)
     if type(machineCode) == str:
         return machineCode
 
@@ -523,10 +535,12 @@ lastPC = 0              # where the program counter was 1 instruction ago
 codeSize = 0            # can't execute past this or read/write before this
 reads = []              # EDIT: reads supplied with initial run for online editor
 writes = []             # EDIT: writes collected in list instead of printed
-states = [[0]] + [[0]*16]
+states = [[0, [0]*16, '', []]]
+errors = {}
+stack = {}
 
 def resetGlobals():
-    global memory, registers, pc, instruction, debug, ask, lastPC, codeSize, reads, writes, states
+    global memory, registers, pc, instruction, debug, ask, lastPC, codeSize, reads, writes, states, errors, stack
     memory = [0]*256
     registers = [0]*16
     pc = 0
@@ -537,7 +551,9 @@ def resetGlobals():
     codeSize = 0
     reads = []
     writes = []
-    states = [[0, [0]*16, '']]
+    states = [[0, [0]*16, '', []]]
+    errors = {}
+    stack = {}
 
 def validInteger(x):
     if type(x) == int:
@@ -614,7 +630,7 @@ def validAddr(addr):
 
 def runHmmm(inputs):
     """Execute a program that has previously been loaded into Hmmm's memory."""
-    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
+    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states, stack
     for x in inputs.split():
         reads += [x]
     while pc != -1:         # fetch/execute cycle
@@ -626,10 +642,16 @@ def runHmmm(inputs):
         lastPC = pc
         pc = pc+1           # increment pc
         try:
-            states += [['','','']]
+            states += [['','','',[]]]
             execute(instruction)
             states[-1][0] = pc
             states[-1][1] = copy.deepcopy(registers)
+            states[-1][3] = stack
+            # if len(stack) != 0:
+            #     L = memory[min(stack) : max(stack) + 1]
+            #     states[-1][3] = {i+min(stack):L[i] for i in range(len(L))}
+            # states[-1][1]
+
         except KeyboardInterrupt:
             print("\n\nInterrupted by user, halting program execution...\n")
             sys.exit()
@@ -637,14 +659,25 @@ def runHmmm(inputs):
             print("\n\nEnd of input, halting program execution...\n")
             sys.exit()
 
-def runHmmmSteps(inputs, numSteps):
+def runHmmmSteps(input, state, numSteps):
     """Execute a program that has previously been loaded into Hmmm's memory."""
-    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states
-    for x in inputs.split():
-        reads += [x]
+    global pc, instruction, memory, registers, loop_check, lastPC, codeSize, reads, writes, states, errors, stack
+    if input != '':
+        reads += [input]
+    pc = state[0]
+    if len(state[3]) != 0:
+        stack = state[3]
+        start = min(stack)
+        stackEdited = list(range(start, start + len(stack)))
+        newStack = [stack[x] for x in stackEdited]
+        memory[start:start + len(stack)] = newStack
+    registers = copy.deepcopy(state[1])
+    states = [state]
     for i in range(numSteps):         # fetch/execute cycle
         if pc == -1:
             break
+        if pc in errors:
+            return errors[pc]
         if not validPC(pc):
             simulationError("Memory Out of Bounds Error.\n"
               + "Program attempted to execute memory location " + str(pc))
@@ -653,10 +686,18 @@ def runHmmmSteps(inputs, numSteps):
         lastPC = pc
         pc = pc+1           # increment pc
         try:
-            states += [['','','']]
+            print('regs',registers)
+            states += [['','','',[]]]
             execute(instruction)
             states[-1][0] = pc
             states[-1][1] = copy.deepcopy(registers)
+            states[-1][3] = stack
+            print('hewwo2')
+            # if len(stack) != 0:
+            #     L = memory[min(stack) : max(stack) + 1]
+            #     states[-1][3] = {i+min(stack):L[i] for i in range(len(L))}
+            print('stack',states[-1][3])
+
         except KeyboardInterrupt:
             print("\n\nInterrupted by user, halting program execution...\n")
             sys.exit()
@@ -801,11 +842,13 @@ def op_loadn(args):
     registers[args[0]] = memory[args[1]]
 
 def op_storen(args):
-    global registers, memory, lastPC
+    global registers, memory, lastPC, stack
     if not validAddr(args[1]):
         simulationError("Invalid store target at pc " + str(lastPC) \
           + ": " + str(args[1]))
     memory[args[1]] = registers[args[0]]
+    #stackEdited += [args[1]]
+    stack[args[1]] = registers[args[0]]
 
 def op_loadr(args):
     global registers, memory, lastPC
@@ -815,11 +858,13 @@ def op_loadr(args):
     registers[args[0]] = memory[registers[args[1]]]
 
 def op_storer(args):
-    global registers, memory, lastPC
+    global registers, memory, lastPC, stack
     if not validAddr(registers[args[1]]):
         simulationError("Invalid store target at pc " + str(lastPC) \
           + ": " + str(registers[args[1]]))
     memory[registers[args[1]]] = registers[args[0]]
+    #stackEdited += [registers[args[1]]]
+    stack[registers[args[1]]] = registers[args[0]]
 
 def op_popr(args):
     global registers, memory, lastPC
@@ -830,11 +875,16 @@ def op_popr(args):
     registers[args[0]] = memory[registers[args[1]]]
 
 def op_pushr(args):
-    global registers, memory, lastPC
+    global registers, memory, lastPC, stack
     if not validAddr(registers[args[1]]):
         simulationError("Invalid push target at pc " + str(lastPC) \
           + ": " + str(registers[args[1]]))
     memory[registers[args[1]]] = registers[args[0]]
+    print(registers[args[1]])
+    print(registers[args[0]])
+    print(type(stack))
+    stack[registers[args[1]]] = registers[args[0]]
+    #stackEdited += [registers[args[1]]]
     registers[args[1]] += 1
 
 def op_addn(args):

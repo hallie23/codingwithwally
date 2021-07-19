@@ -2,6 +2,7 @@
 
 {% block head %}
 <link rel = "stylesheet" href= "{{ url_for('static', filename = 'css/writeCode.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 <script type = "text/javascript" src = "https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
 <script type = "text/javascript" src="{{ url_for('static', filename = 'ace/mytheme.js') }}"></script>
 <script type = "text/javascript" src="{{ url_for('static', filename = 'js/download.js') }}"></script>
@@ -18,13 +19,42 @@
 
 	var states = [];
 	var currentState = 0;
+	var removedInput = [];
+	pc = 0;
 	$(function() {
 		$('input#runAll').click(function() {
-		if (! ace.edit("jsEditor").getValue().includes('halt')) {
-			var error = "Code must include operation 'halt'";
-			$("#errors").text(error);
-			return;
-		}
+			$("#errors").text('');
+			if (document.getElementById("runStep").classList.contains('buttonSelected')) {
+				document.getElementById("runStep").classList.remove('buttonSelected');
+			}
+			document.getElementById("forward").style.display = "none";
+			document.getElementById("back").style.display = "none";
+
+			document.getElementById("myText").classList.remove('boxSelected');
+
+			var numReads = (ace.edit("jsEditor").getValue().match(/read/g) || []).length;
+			var idk = $("#myText").val().replace(/,/g," ").trim().split(/\s+/);
+			var l = idk.length;
+			if (idk[0].trim() == '') {
+				l = 0;
+			}
+
+			if (! ace.edit("jsEditor").getValue().includes('halt')) {
+				var error = "Code must include operation 'halt'";
+				$("#errors").text(error);
+				return;
+			}
+			else if (l < numReads) {
+				if (numReads == 1) {
+					$("#errors").text(numReads.toString() + ' input is required');
+				}
+				else {
+					$("#errors").text(numReads.toString() + ' inputs are required');
+				}
+				document.getElementById("myText").classList.add("boxSelected");
+				document.getElementById("myText").focus();
+				return;
+			}
 		$("#errors").text('');
 		$.getJSON('/background_process_writeHMMM', {
 			code: ace.edit("jsEditor").getValue(),
@@ -35,11 +65,6 @@
 			}
 			else{
 				document.getElementById("runAll").classList.add('buttonSelected');
-				if (document.getElementById("runStep").classList.contains('buttonSelected')) {
-					document.getElementById("runStep").classList.remove('buttonSelected');
-				}
-				document.getElementById("forward").style.display = "none";
-				document.getElementById("back").style.display = "none";
 
 				var print = "";
 				var outputs = data.result[0];
@@ -48,9 +73,7 @@
 				}
 				$("#result").text(print);
 
-				currentState = 0;
-				states = data.result[1];
-				var registers = data.result[1][states.length - 1][1];
+				var registers = data.result[1][1];
 				var rows = '<tr><td>registers</td><td>values</td></tr>';
 				for (i = 0; i < registers.length; i++) {
 					var row = '<tr>';
@@ -60,8 +83,29 @@
 				}
 
 				$("#regTable").html(rows);
-			}
 
+				var stackText = '';
+				const zeroPad = (num, places) => String(num).padStart(places, '0');
+				var stack = data.result[1][3];
+				if (Object.keys(stack).length != 0) {
+					var startLine = 256;
+
+					for(var key in stack) {
+						if (key < startLine) {
+							startLine = key;
+						}
+					}
+
+					for (i = 0; i < stack.length; i++) {
+						var num = zeroPad((i + startLine).toString());
+						stackText += '<span style="color:#ae81ff">' + num + ' ' + '</span>';
+						stackText += '<span style="color:#ffffff">' + stack[i + startLine] + '\n' + '</span>';
+					}
+					stackText += '<span style="color:#5B5D52">hi</span>';
+				}
+
+				$("#stack").html(stackText);
+			}
 
 		});
 		return false;
@@ -72,105 +116,129 @@
 
 	$(function() {
 		$('input#runStep').click(function() {
-		$("#errors").text('');
-		$.getJSON('/background_process_writeHMMM', {
-			code: ace.edit("jsEditor").getValue(),
-			inputs: $("#myText").val(),
-		}, function(data) {
+			$("#errors").text('');
 			// if ($("#mode").val() == true)
-			if (typeof data.result == "string"){
-				$("#result").text(data.result);
+			currentState = 0;
+			written = '';
+			removedInput = [];
+			states = [[0, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], "", []]];
+			pc = 0;
+
+			document.getElementById("runStep").classList.add('buttonSelected');
+			if (document.getElementById("runAll").classList.contains('buttonSelected')) {
+				document.getElementById("runAll").classList.remove('buttonSelected');
 			}
-			else{
-				currentState = 0;
-				written = '';
-				states = data.result[1];
+			document.getElementById("forward").style.display = "block";
+			document.getElementById("back").style.display = "block";
 
-				document.getElementById("runStep").classList.add('buttonSelected');
-				if (document.getElementById("runAll").classList.contains('buttonSelected')) {
-					document.getElementById("runAll").classList.remove('buttonSelected');
-				}
-				document.getElementById("forward").style.display = "block";
-				document.getElementById("back").style.display = "block";
-				if (states.length <= 2) {
-					document.getElementById("forward").className = "buttonDisabled";
-				}
-				else {
-					document.getElementById("forward").className = "buttonActive";
-				}
-				document.getElementById("back").className = "buttonDisabled";
-				
-				//ace.edit("jsEditor").moveCursorTo(0,0);
-				//ace.edit("jsEditor").selection.selectLine();
-				var lineLen = ace.edit("jsEditor").session.getLine(0).length;
-				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(0,0,0,10));
+			document.getElementById("myText").classList.remove('boxSelected');
 
-				var rows = '<tr><td>registers</td><td>values</td></tr>';
-				for (i = 0; i < 16; i++) {
-					var row = '<tr>';
-					row += '<td>' + "r" + i.toString() + '</td>';
-					row += '<td>' + '0' + '</td>';
-					rows += row + '<tr>';
-				}
+			render();
 
-				$("#regTable").html(rows);
-				$("#result").text(written);
-			}
-
-
-		});
 		return false;
 		});
 	});
 
 	$(function() {
-		$("input#forward").click(function() {
-			if (document.getElementById("forward").className == "buttonActive") {
+		$("button#forward").click(function() {
+			// only run if button is not disabled
+			if (document.getElementById("forward").className != "buttonActive") {
+				return false;
+			}
+
+			var read = "";
+			var lineNum = states[currentState][0];
+			var currentLine = ace.edit("jsEditor").getValue().split('\n')[lineNum];
+			if (currentLine.includes('read')) {
+				if ($("#myText").val().trim().length == 0) {
+					document.getElementById("myText").classList.add("boxSelected");
+					document.getElementById("myText").focus();
+					$("#errors").text('please add input');
+					// highlight input box, put text (input required)
+					return false;
+				}
+				else {
+					// what if not an int?
+					var inputs = $("#myText").val();
+					var reads = inputs.replace(/,/g," ").trim().split(/\s+/);
+					read = reads[0];
+
+					if (reads.length == 1) {
+						$("#myText").val('');
+						// here
+						removedInput = removedInput.concat(inputs);
+					}
+					else {
+						var temp1 = inputs.indexOf(read);
+						var temp2 = inputs.substring(temp1+1).indexOf(reads[1]);
+						var index = temp1 + temp2 + 1;
+						
+						removedInput = removedInput.concat(inputs.substring(0, index));
+						$("#myText").val(inputs.substring(index));
+						// here
+					}
+
+					if (removedInput.slice(-1)[0].slice(-1) != ' ') {
+						removedInput[removedInput.length - 1] += ' ';
+					}
+				}
+			}
+
+			// has the next step been run already?
+			if (currentState == states.length - 1) {
 				currentState++;
 
-				if (currentState > 0) {
-					document.getElementById("back").className = "buttonActive";
-				}
-				if (currentState >= states.length - 2) {
-					document.getElementById("forward").className = "buttonDisabled";
-				}
+				$.getJSON('/background_process_HMMMstep', {
+					code: ace.edit("jsEditor").getValue(),
+					state: JSON.stringify(states[states.length - 1]),
+					input: read,
+				}, function(data) {
+					if (typeof data.result == "string"){
+						$("#errors").text(data.result);
+						currentState--;
+						return false;
+					}
+					else {
+						states = states.concat([data.result[1]]);
+						console.log('hello', states);
+					}
+
+					if (states[currentState][2] == 'r') {
+						// ask for input?
+					}
+					else if (states[currentState][2] != '') {
+						written += states[currentState][2].toString() + '\n';
+					}
+
+					render();
+				});
+			}
+			// if the next step is already rendered
+			else {
+				currentState++;
+
 				if (states[currentState][2] == 'r') {
-				 	// ask for input?
+					// ask for input?
 				}
 				else if (states[currentState][2] != '') {
-				 	written += states[currentState][2].toString() + '\n';
+					written += states[currentState][2].toString() + '\n';
 				}
 
-				var line = states[currentState][0];
-				var lineLen = ace.edit("jsEditor").session.getLine(line).length;
-				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(line,0,line,lineLen));
-
-				var registers = states[currentState][1];
-				var rows = '<tr><td>registers</td><td>values</td></tr>';
-				for (i = 0; i < registers.length; i++) {
-					var row = '<tr>';
-					row += '<td>' + "r" + i.toString() + '</td>';
-					row += '<td>' + registers[i].toString() + '</td>';
-					rows += row + '<tr>';
-				}
-				$("#regTable").html(rows);
-				$("#result").text(written);
+				render();
 			}
+			console.log(states);
+		return false;
 		});
 	});
 
 	$(function() {
-		$("input#back").click(function() {
+		$("button#back").click(function() {
 			// only run if button is not disabled
 			if (document.getElementById("back").className == "buttonActive") {
+				$("#errors").text('');
 				currentState = currentState - 1;
 				
-				if (currentState < states.length - 2) {
-					document.getElementById("forward").className = "buttonActive";
-				}
-				if (currentState == 0) {
-					document.getElementById("back").className = "buttonDisabled";
-				}
+				//if writing
 				if (states[currentState+1][2] != 'r' && states[currentState+1][2] != '') {
 					if (written.split('\n').length <= 2) {
 						written = '';
@@ -179,22 +247,150 @@
 						written = written.substring(0, written.substring(0,written.length-1).lastIndexOf("\n") + 1);
 					}
 				}
-				
-				var line = states[currentState][0];
-				var lineLen = ace.edit("jsEditor").session.getLine(line).length;
-				ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(line,0,line,lineLen));
 
-				var registers = states[currentState][1];
-				var rows = '<tr><td>registers</td><td>values</td></tr>';
-				for (i = 0; i < registers.length; i++) {
-					var row = '<tr>';
-					row += '<td>' + "r" + i.toString() + '</td>';
-					row += '<td>' + registers[i].toString() + '</td>';
-					rows += row + '<tr>';
+				var lineNum = states[currentState][0];
+				var currentLine = ace.edit("jsEditor").getValue().split('\n')[lineNum];
+				if (currentLine.includes('read')) {
+					var text = $('#myText').val();
+					$('#myText').val(removedInput.slice(-1) + text);
+					removedInput = removedInput.slice(0,-1);
 				}
-				$("#regTable").html(rows);
-				$("#result").text(written);
+
+				// if (states[currentState+1][2] == 'r') {
+				// 	var text = $('#myText').val();
+				// 	$('#myText').val(removedInput.slice(-1) + text);
+				// 	removedInput = removedInput.slice(0,-1);
+				// }
+
+				render();
 			}
+		return false;
+		});
+	});
+
+	function render() {
+		if (currentState > 0) {
+			document.getElementById("back").className = "buttonActive";
+		}
+		else {
+			document.getElementById("back").className = "buttonDisabled";
+		}
+
+		var pc = states[currentState][0];
+		if (pc >= ace.edit("jsEditor").session.getLength() || pc < 0) {
+			document.getElementById("forward").className = "buttonDisabled";
+		}
+		else {
+			document.getElementById("forward").className = "buttonActive";
+		}
+
+		var line = states[currentState][0];
+		var lineLen = ace.edit("jsEditor").session.getLine(line).length;
+		ace.edit("jsEditor").selection.setSelectionRange(new ace.Range(line,0,line,lineLen));
+		
+		var registers = states[currentState][1];
+		var rows = '<tr><td>registers</td><td>values</td></tr>';
+		for (i = 0; i < registers.length; i++) {
+			var row = '<tr>';
+			row += '<td>' + "r" + i.toString() + '</td>';
+			row += '<td>' + registers[i].toString() + '</td>';
+			rows += row + '<tr>';
+		}
+
+		var stackText = '';
+		const zeroPad = (num, places) => String(num).padStart(places, '0');
+		
+		var stack = states[currentState][3];
+		if (Object.keys(stack).length != 0) {
+			var startLine = 256;
+
+			for(var key in stack) {
+				if (key < startLine) {
+					startLine = parseInt(key);
+				}
+			}
+			var stackPointer = states[currentState][1][15];
+			// if (stackPointer < startLine) {
+			// 	var lines = startLine - stackPointer;
+			// 	for (i = 0; i < lines; i++) {
+			// 		var num = zeroPad((i + startLine).toString());
+			// 		stackText += '<span style="color:#6A558F">' + num + ' ' + '</span>';
+			// 		stackText += '<span style="color:#5B5D52">' + 0 + '\n' + '</span>';
+			// 	}
+			// }
+			for (i = 0; i < Object.keys(stack).length; i++) {
+				var num = zeroPad((i + startLine).toString());
+				if (num > stackPointer) {
+					stackText += '<span style="color:#6A558F">' + num + ' ' + '</span>';
+					stackText += '<span style="color:#5B5D52">' + stack[i + startLine] + '\n' + '</span>';
+					continue;
+				}
+				else if (num == stackPointer) {
+					stackText += '<span style="color:#ae81ff">' + num + ' ' + '</span>';
+					stackText += '<span style="color:#5B5D52; background-color:#45473e">' + stack[i + startLine] + ' \n' + '</span>';
+					continue;
+				}
+				stackText += '<span style="color:#ae81ff">' + num + ' ' + '</span>';
+				stackText += '<span style="color:#ffffff">' + stack[i + startLine] + '\n' + '</span>';
+				if (stackPointer - 1 == i + startLine && Object.keys(stack).length - 1 == i) {
+					stackText += '<span style="color:#ae81ff">' + (parseInt(num)+1).toString() + ' ' + '</span>';
+					stackText += '<span style="color:#ffffff; background-color:#45473e">' + '  ' + '\n' + '</span>';
+				}
+			}
+		}
+		stackText += '<span style="color:#5B5D52">...</span>';
+		
+		$("#stack").html(stackText);
+
+		$("#regTable").html(rows);
+
+		$("#result").text(written);
+    }
+
+	$(function() {
+		$('#myText').on('input',function(e){
+    	document.getElementById("myText").classList.remove('boxSelected');
+		$("#errors").text('');
+		});
+	});
+
+	$(function() {
+		ace.edit("jsEditor").session.getDocument().on("change", function(e) {
+			if (document.getElementById("runAll").classList.contains('buttonSelected')) {
+				document.getElementById("runAll").classList.remove('buttonSelected');
+			}
+			if (document.getElementById("runStep").classList.contains('buttonSelected')) {
+				document.getElementById("runStep").classList.remove('buttonSelected');
+			}
+			document.getElementById("forward").style.display = "none";
+			document.getElementById("back").style.display = "none";
+		});
+	});
+
+	$(function() {
+		$("#showStack").click(function() {
+			if (document.getElementById("stack").style.display == "none") {
+				document.getElementById("stack").style.display = "block";
+				document.getElementById("jsEditor").style.height = "25vh";
+				document.getElementById("showStack").style.borderBottom = "none";
+				document.getElementById("jsEditor").style.borderBottom = "none";
+				document.getElementById("showStack").value = "v show stack v";
+				document.getElementById("showStack").style.borderTop = "0.2em black solid";
+			}
+			else {
+				document.getElementById("stack").style.display = "none";
+				document.getElementById("jsEditor").style.height = "50vh";
+				document.getElementById("showStack").style.borderBottom = "0.2em black solid";
+				document.getElementById("jsEditor").style.borderBottom = "0.2em black solid";
+				document.getElementById("showStack").value = "^ show stack ^";
+				document.getElementById("showStack").style.borderTop = "none";
+			}
+		});
+	});
+
+	$(function() {
+		$("#result").click(function() {
+			$('#result').text("hello");
 		});
 	});
 
@@ -217,18 +413,9 @@
 			// })
 			editor.setTheme("ace/theme/monokai");
 			editor.session.setMode("ace/mode/python");
+			editor.renderer.setShowGutter(false);
 			//Selection.on("changeCursor", function())
 			editor.moveCursorTo(0,3);
-			editor.session.getDocument().on("change", function(e) {
-				if (document.getElementById("runAll").classList.contains('buttonSelected')) {
-					document.getElementById("runAll").classList.remove('buttonSelected');
-				}
-				if (document.getElementById("runStep").classList.contains('buttonSelected')) {
-					document.getElementById("runStep").classList.remove('buttonSelected');
-				}
-				document.getElementById("forward").style.display = "none";
-				document.getElementById("back").style.display = "none";
-			});
 			editor.commands.addCommand({
 				name: "returnReorder",
 				bindKey: {win: "return", mac: "return"},
@@ -271,11 +458,11 @@
 					var ops = ['jumpn','jeqzn','jnezn','jgtzn','jltzn','calln'];
 					for (n=0; n<length; n++) {
 						var line = toShift[n];
-						if ((ops.filter(x => line.includes(x))).length > 0) {
+						if ((ops.filter(y => line.includes(y))).length > 0) {
 							var num = parseInt(line.slice(-2));
 							if (num >= start-1 && num < length-1) {
-								newNum = zeroPad((num + 1).toString(), 2);
-								line = line.slice(0,-2) + newNum;
+								var newNum = zeroPad((num + 1).toString(), 2);
+								line = line.slice(0,-2).trim() + ' ' + newNum;
 							}
 						}
 						if (!isNaN(line.slice(0,2)) && line.slice(0,2) != '') {
@@ -319,7 +506,7 @@
 						var x = 0;
 						for (n=0; n<length; n++) {
 							var line = toShift[n];
-							if ((ops.filter(x => line.includes(x))).length > 0) {
+							if ((ops.filter(y => line.includes(y))).length > 0) {
 								var num = parseInt(line.trim().slice(-2));
 								if (num - 1 >= r && num < length) { ///check
 								 	newNum = zeroPad((num - 1).toString(), 2);
@@ -390,11 +577,28 @@
 			})
 		</script>
     </form>
+	<div id = "showStack" style = "color:white">show stack</div>
+	<div id = "stack" style = "display:none"></div>
+
+	<!-- <script type = "text/javascript">
+		var editor = ace.edit("stack");
+		editor.setTheme("ace/theme/monokai");
+		editor.session.setMode("ace/mode/python");
+		editor.renderer.setShowGutter(false);
+		//editor.session.setUseWorker(false);
+		//editor.setShowPrintMargin(false);
+		editor.setReadOnly(true);
+	</script> -->
+
+
+
+	<p id = 'adjust' ></p>
 	<div id="buttons">
 		<input class = "buttonActive" id = "runAll" type = "submit" value="RUN ALL" />
 		<input class = "buttonActive" id = "runStep" type = "submit" value="STEP THROUGH" />
-		<input class = "buttonDisabled" id = "back" type = "button" value="<- back" style="display:none"/>
-		<input class = "buttonDisabled" id = "forward" type = "button" value="-> next" style="display:none"/>
+		<button class="buttonActive" id='download'><i class="fa fa-download"></i> Download</button>
+		<button class="buttonDisabled" id='back' style="display:none"><i class="fas fa-arrow-right"></i> back</button>
+		<button class="buttonDisabled" id='forward' style="display:none">next  <i class="fa fa-arrow-right"></i></button>
 	</div>
 {% endblock %}
 

@@ -1,45 +1,21 @@
 html, body {
     font-family: "Verdana", sans-serif;
-    overflow: scroll; 
+    overflow: visible; 
     height: 100%;
     background-color: rgb(39, 40, 34);
     color: white;
     cursor: default;
 }
 
-#sidebar{
-    height: 100%; /* Full-height: remove this if you want "auto" height */
-    width: 200px; /* Set the width of the sidebar */
-    position: fixed; /* Fixed Sidebar (stay in place on scroll) */
-    z-index: 1; /* Stay on top */
-    top: 0; /* Stay at the top */
-    left: 0;
-    background-color: rgb(20,20,20); /* Black */
-    overflow-x: hidden; /* Disable horizontal scroll */
-    padding-top: 20px;
-}
-#sidebar a {
-    font-family: "Verdana", sans-serif;
-    padding: 15px 8px 15px 16px;
-    text-decoration: none;
-    font-size: 23px;
-    color: rgb(255,181,49);
-    display: block;
-  }
-
-#sidebar a:hover {
-    transition: background-color 0.2s ease;
-    transition: color 0.2s ease;
-
-    background-color: rgb(255,181,49);
-    color: rgb(39, 40, 34);
-}
-
 #download {
-    width: 50px;
-    margin-left: 50px;
-    overflow-x:
+    width: 100px;
+    margin-top: 23px;
+    margin-right: 18px;
+    background-color: white;
+    font-size: 13px;
+    float: right;
 }
+
 #main {
     height: 100%;
     margin-left: 200px; /* Same as the width of the sidebar */
@@ -60,6 +36,10 @@ html, body {
 
 #leftcontent{
     width: 50%;
+    flex-grow: 1;
+    overflow-x: visible;
+    resize: horizontal;
+    position: relative;
 }
 
 #midcontent{
@@ -71,9 +51,9 @@ html, body {
     flex-grow: 1;
     margin-left: 1em;
     margin-right: 1em;
-    overflow-x: visible;
     max-height: 50vh;
     overflow-y: scroll;
+    overflow-x: hidden;
 }
 
 #rightcontent{
